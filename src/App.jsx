@@ -1,16 +1,49 @@
 import Editor from "@monaco-editor/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import "./App.css";
 
 function App() {
   const [code, setCode] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const analyzeCode = async () => {
-    try {
-      setLoading(true);
+  const editorRef = useRef(null);
+  const monacoRef = useRef(null);
+  const decorationsRef = useRef([]);
 
-      const response = await fetch("http://127.0.0.1:8000/analyze", {
+  const clearEditorHighlights = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    decorationsRef.current = editor.deltaDecorations(decorationsRef.current, []);
+  };
+
+  const markErrorLine = (errorLine) => {
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+
+    if (!editor || !monaco || !errorLine) return;
+
+    decorationsRef.current = editor.deltaDecorations(decorationsRef.current, [
+      {
+        range: new monaco.Range(errorLine, 1, errorLine, 1),
+        options: {
+          isWholeLine: true,
+          className: "errorLine",
+          glyphMarginClassName: "errorGlyph",
+        },
+      },
+    ]);
+
+    editor.revealLineInCenter(errorLine);
+  };
+
+  const analyzeCode = async () => {
+    clearEditorHighlights();
+    setLoading(true);
+    setResult(null);
+
+    try {
+      const response = await fetch("http://127.0.0.1:8001/analyze", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -20,24 +53,57 @@ function App() {
 
       const data = await response.json();
       setResult(data);
+
+      if (data.status === "error" && data.error_line) {
+        markErrorLine(data.error_line);
+      }
     } catch (error) {
       console.error(error);
+      setResult({
+        status: "error",
+        message: "Backend bağlantı hatası.",
+        error_line: "-",
+        suggestion: "Backend çalışıyor mu kontrol et: uvicorn main:app --reload --port 8001",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const loadSampleCode = () => {
-    setCode(`api_key = "sk-test-123456"
-password = "12345"
+  const fixCode = async () => {
+    setLoading(true);
 
-def login(user):
-    if password == "12345":
-        return True
-    return False
+    try {
+      const response = await fetch("http://127.0.0.1:8001/fix", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code }),
+      });
 
-for i in range(5):
-    print(i)`);
+      const data = await response.json();
+
+      if (data.fixed_code) {
+        setCode(data.fixed_code);
+        clearEditorHighlights();
+      }
+
+      setResult({
+        status: "fixed",
+        fixes: data.fixes,
+      });
+    } catch (error) {
+      console.error(error);
+      setResult({
+        status: "error",
+        message: "Fix işlemi başarısız oldu.",
+        error_line: "-",
+        suggestion: "Backend /fix endpointini kontrol et.",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const riskColor =
@@ -51,7 +117,7 @@ for i in range(5):
     <div
       style={{
         minHeight: "100vh",
-        backgroundColor: "#0f172a",
+        backgroundColor: "#020f2f",
         color: "white",
         padding: "40px",
         fontFamily: "Arial",
@@ -61,63 +127,132 @@ for i in range(5):
         AI Code Analyzer
       </h1>
 
-      <p style={{ textAlign: "center", color: "#94a3b8" }}>
+      <p style={{ textAlign: "center", color: "#bfc9d9" }}>
         Python kodlarını güvenlik, karmaşıklık ve kalite açısından analiz eder.
       </p>
 
-      <div style={{ marginTop: "25px", borderRadius: "12px", overflow: "hidden" }}>
+      <div
+        style={{
+          marginTop: "30px",
+          border: "1px solid #23395d",
+          borderRadius: "12px",
+          overflow: "hidden",
+        }}
+      >
         <Editor
           height="400px"
           defaultLanguage="python"
-          theme="vs-dark"
           value={code}
-          onChange={(value) => setCode(value || "")}
+          onChange={(value) => {
+            setCode(value || "");
+            clearEditorHighlights();
+          }}
+          theme="vs-dark"
+          beforeMount={(monaco) => {
+            monacoRef.current = monaco;
+          }}
+          onMount={(editor) => {
+            editorRef.current = editor;
+          }}
           options={{
             fontSize: 16,
             minimap: { enabled: false },
+            glyphMargin: true,
             automaticLayout: true,
           }}
         />
       </div>
 
-      <div style={{ textAlign: "center" }}>
-        <button
-          onClick={loadSampleCode}
-          style={{
-            marginTop: "20px",
-            marginRight: "12px",
-            padding: "14px 28px",
-            borderRadius: "10px",
-            border: "1px solid #334155",
-            backgroundColor: "#1e293b",
-            color: "white",
-            fontSize: "16px",
-            cursor: "pointer",
-          }}
-        >
-          Load Sample Code
-        </button>
-
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: "16px",
+          marginTop: "20px",
+        }}
+      >
         <button
           onClick={analyzeCode}
+          disabled={loading}
           style={{
-            marginTop: "20px",
-            padding: "14px 32px",
-            borderRadius: "10px",
+            padding: "14px 28px",
             border: "none",
+            borderRadius: "10px",
             backgroundColor: "#3b82f6",
             color: "white",
             fontSize: "18px",
-            cursor: "pointer",
+            cursor: loading ? "not-allowed" : "pointer",
+            opacity: loading ? 0.6 : 1,
           }}
         >
           Analyze Code
         </button>
 
-        {loading && <p>Analyzing code...</p>}
+        {result?.status === "error" && (
+          <button
+            onClick={fixCode}
+            disabled={loading}
+            style={{
+              padding: "14px 28px",
+              border: "none",
+              borderRadius: "10px",
+              backgroundColor: "#16a34a",
+              color: "white",
+              fontSize: "18px",
+              cursor: loading ? "not-allowed" : "pointer",
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            Fix the Code
+          </button>
+        )}
       </div>
 
-      {result && (
+      {loading && (
+        <p style={{ textAlign: "center", marginTop: "20px" }}>
+          Processing code...
+        </p>
+      )}
+
+      {result?.status === "error" && (
+        <div
+          style={{
+            marginTop: "30px",
+            backgroundColor: "#450a0a",
+            border: "1px solid #ef4444",
+            padding: "22px",
+            borderRadius: "12px",
+          }}
+        >
+          <h2>Syntax Error</h2>
+          <p>{result.message}</p>
+          <p>
+            <strong>Error Line:</strong> {result.error_line}
+          </p>
+          <p>{result.suggestion}</p>
+        </div>
+      )}
+
+      {result?.status === "fixed" && (
+        <div
+          style={{
+            marginTop: "30px",
+            backgroundColor: "#052e16",
+            border: "1px solid #22c55e",
+            padding: "22px",
+            borderRadius: "12px",
+          }}
+        >
+          <h2>Applied Fixes</h2>
+          <ul>
+            {result.fixes?.map((fix, index) => (
+              <li key={index}>{fix}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {result?.status === "success" && (
         <div style={{ marginTop: "35px" }}>
           <h2 style={{ textAlign: "center" }}>Analysis Result</h2>
 
@@ -153,63 +288,18 @@ for i in range(5):
             </div>
           </div>
 
-          <div
-            style={{
-              backgroundColor: "#1e293b",
-              padding: "22px",
-              borderRadius: "12px",
-              marginTop: "20px",
-            }}
-          >
+          <div style={{ backgroundColor: "#1e293b", padding: "22px", borderRadius: "12px", marginTop: "20px" }}>
             <h3>Summary</h3>
             <p>{result.summary}</p>
           </div>
 
-          <div
-            style={{
-              backgroundColor: "#1e293b",
-              padding: "22px",
-              borderRadius: "12px",
-              marginTop: "20px",
-              border: "1px solid #334155",
-            }}
-          >
-            <h3>AI Agent Recommendation</h3>
-            <p>{result.agent_recommendation}</p>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, 1fr)",
-              gap: "18px",
-              marginTop: "20px",
-            }}
-          >
-            <div style={{ backgroundColor: "#1e293b", padding: "22px", borderRadius: "12px" }}>
-              <h3>Detected Risks</h3>
-              <p>
-                <strong>Imports:</strong>{" "}
-                {result.security?.imports?.join(", ") || "None"}
-              </p>
-              <p>
-                <strong>Dangerous Calls:</strong>{" "}
-                {result.security?.dangerous_calls?.join(", ") || "None"}
-              </p>
-              <p>
-                <strong>Hardcoded Secrets:</strong>{" "}
-                {result.security?.hardcoded_secrets?.join(", ") || "None"}
-              </p>
-            </div>
-
-            <div style={{ backgroundColor: "#1e293b", padding: "22px", borderRadius: "12px" }}>
-              <h3>Suggestions</h3>
-              <ul>
-                {result.suggestions?.map((item, index) => (
-                  <li key={index}>{item}</li>
-                ))}
-              </ul>
-            </div>
+          <div style={{ backgroundColor: "#1e293b", padding: "22px", borderRadius: "12px", marginTop: "20px" }}>
+            <h3>Suggestions</h3>
+            <ul>
+              {result.suggestions?.map((item, index) => (
+                <li key={index}>{item}</li>
+              ))}
+            </ul>
           </div>
         </div>
       )}
