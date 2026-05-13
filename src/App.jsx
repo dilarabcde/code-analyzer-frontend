@@ -13,6 +13,25 @@ function App() {
   const editorRef = useRef(null);
   const monacoRef = useRef(null);
   const decorationsRef = useRef([]);
+  const handleSingleFileUpload = (event) => {
+  const file = event.target.files[0];
+
+  if (!file) return;
+
+  if (!file.name.endsWith(".py")) {
+    alert("Lütfen sadece .py uzantılı Python dosyası yükleyin.");
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onload = (e) => {
+    setCode(e.target.result);
+    clearEditorHighlights();
+  };
+
+  reader.readAsText(file);
+};
 
   const clearEditorHighlights = () => {
     const editor = editorRef.current;
@@ -167,12 +186,12 @@ function App() {
           </div>
 
           <div className="editorBox">
-
-            <div className="language-bar">
+            
+            <div className="editorTopBar">
+            <div className="languageSelector">
               <select
                 value={selectedLanguage}
                 onChange={(e) => setSelectedLanguage(e.target.value)}
-                className="language-select"
               >
                 <option value="python">Python</option>
                 <option value="javascript">JavaScript</option>
@@ -182,6 +201,16 @@ function App() {
               </select>
             </div>
 
+            <label className="uploadButton">
+              Upload Python File
+              <input
+                type="file"
+                accept=".py"
+                onChange={handleSingleFileUpload}
+                hidden
+              />
+            </label>
+            </div>
             <Editor
               height="520px"
               language={selectedLanguage}
@@ -205,8 +234,7 @@ function App() {
                 automaticLayout: true,
               }}
             />
-          </div>
-
+            </div>
           <div className="buttons">
             <button className="actionButton analyzeButton" onClick={analyzeCode} disabled={loading}>
               {loading ? "Analyzing..." : "Analyze Code"}
@@ -325,45 +353,7 @@ function App() {
                 ))}
               </div>
             )}
-            {projectResult.most_complex_file && (
-              <div className="insightCard">
-                <h4>Most Complex File</h4>
 
-                <p>
-                  <strong>
-                    {projectResult.most_complex_file.filename}
-                  </strong>
-                </p>
-
-                <p>
-                  Complexity: {projectResult.most_complex_file.complexity}
-                </p>
-
-                <p>
-                  Lines: {projectResult.most_complex_file.line_count}
-                </p>
-
-                <p>
-                  Functions: {projectResult.most_complex_file.function_count}
-                </p>
-              </div>
-            )}
-
-            {projectResult.dependency_graph && (
-              <div className="insightCard">
-                <h4>Dependency Graph</h4>
-
-                {Object.entries(projectResult.dependency_graph).map(([file, deps]) => (
-                  <p key={file}>
-                    <strong>{file}</strong>
-                    {" → "}
-                    {deps.length > 0
-                      ? deps.join(", ")
-                      : "No internal dependency"}
-                  </p>
-                ))}
-              </div>
-            )}
             {projectResult.file_reports && (
               <div className="projectFilesGrid">
                 {projectResult.file_reports.map((file, index) => (
