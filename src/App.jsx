@@ -7,6 +7,8 @@ function App() {
   const [selectedLanguage, setSelectedLanguage] = useState("python");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [projectFiles, setProjectFiles] = useState([]);
+  const [projectResult, setProjectResult] = useState(null);
 
   const editorRef = useRef(null);
   const monacoRef = useRef(null);
@@ -99,6 +101,41 @@ function App() {
       setLoading(false);
     }
   };
+  const analyzeProject = async () => {
+  if (projectFiles.length === 0) {
+    setProjectResult({
+      status: "error",
+      message: "Lütfen analiz edilecek .py dosyalarını seç."
+    });
+    return;
+  }
+
+  setLoading(true);
+  setProjectResult(null);
+
+  const formData = new FormData();
+
+  projectFiles.forEach((file) => {
+    formData.append("files", file);
+  });
+
+  try {
+    const response = await fetch("http://127.0.0.1:8001/analyze-project", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+    setProjectResult(data);
+  } catch (error) {
+    setProjectResult({
+      status: "error",
+      message: "Project analyzer backend bağlantı hatası."
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   const isError = result?.status === "error";
   const isSuccess = result?.status === "success";
@@ -218,6 +255,141 @@ function App() {
           </div>
         </aside>
       </main>
+      <section className="projectUploadPanel">
+        <div className="projectHeader">
+          <div>
+            <h2>Project Understanding Mode</h2>
+            <p>Birden fazla Python dosyası yükle, sistem projenin ne yaptığını analiz etsin.</p>
+          </div>
+
+          <span className="projectBadge">Codebase Analyzer</span>
+        </div>
+
+        <div className="uploadBox">
+          <input
+            type="file"
+            multiple
+            accept=".py"
+            onChange={(e) => setProjectFiles(Array.from(e.target.files))}
+            className="fileInput"
+          />
+
+          <button
+            className="actionButton analyzeButton"
+            onClick={analyzeProject}
+            disabled={loading}
+          >
+            Analyze Project
+          </button>
+        </div>
+
+        {projectFiles.length > 0 && (
+          <div className="fileList">
+            {projectFiles.map((file, index) => (
+              <span key={index} className="fileChip">
+                {file.name}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {projectResult && (
+          <div className={projectResult.status === "error" ? "projectResult errorCard" : "projectResult"}>
+            <h3>Project Analysis Result</h3>
+
+            {projectResult.message && <p>{projectResult.message}</p>}
+
+            {projectResult.project_summary && (
+              <p>{projectResult.project_summary}</p>
+            )}
+            {projectResult.most_complex_file && (
+              <div className="insightCard">
+                <h4>Most Complex File</h4>
+                <p><strong>{projectResult.most_complex_file.filename}</strong></p>
+                <p>Complexity: {projectResult.most_complex_file.complexity}</p>
+                <p>Lines: {projectResult.most_complex_file.line_count}</p>
+                <p>Functions: {projectResult.most_complex_file.function_count}</p>
+              </div>
+            )}
+
+            {projectResult.dependency_graph && (
+              <div className="insightCard">
+                <h4>Dependency Graph</h4>
+
+                {Object.entries(projectResult.dependency_graph).map(([file, deps]) => (
+                  <p key={file}>
+                    <strong>{file}</strong>
+                    {" → "}
+                    {deps.length > 0 ? deps.join(", ") : "No internal dependency"}
+                  </p>
+                ))}
+              </div>
+            )}
+            {projectResult.most_complex_file && (
+              <div className="insightCard">
+                <h4>Most Complex File</h4>
+
+                <p>
+                  <strong>
+                    {projectResult.most_complex_file.filename}
+                  </strong>
+                </p>
+
+                <p>
+                  Complexity: {projectResult.most_complex_file.complexity}
+                </p>
+
+                <p>
+                  Lines: {projectResult.most_complex_file.line_count}
+                </p>
+
+                <p>
+                  Functions: {projectResult.most_complex_file.function_count}
+                </p>
+              </div>
+            )}
+
+            {projectResult.dependency_graph && (
+              <div className="insightCard">
+                <h4>Dependency Graph</h4>
+
+                {Object.entries(projectResult.dependency_graph).map(([file, deps]) => (
+                  <p key={file}>
+                    <strong>{file}</strong>
+                    {" → "}
+                    {deps.length > 0
+                      ? deps.join(", ")
+                      : "No internal dependency"}
+                  </p>
+                ))}
+              </div>
+            )}
+            {projectResult.file_reports && (
+              <div className="projectFilesGrid">
+                {projectResult.file_reports.map((file, index) => (
+                  <div key={index} className="projectFileCard">
+                    <h4>{file.filename}</h4>
+                    <p>Status: {file.status}</p>
+                    <p>Lines: {file.line_count ?? "-"}</p>
+                    <p>Functions: {file.function_count ?? "-"}</p>
+                    <p>Risk: {file.risk_level ?? "-"}</p>
+                    <p>Complexity: {file.complexity ?? "-"}</p>
+                    <p className="file-purpose">
+                      {file.purpose}
+                    </p>
+                    {file.llm_analysis && (
+                      <div className="llmBox">
+                        <h4>AI Analysis</h4>
+                        <p>{file.llm_analysis}</p>
+                      </div>
+                    )}                    
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
 
       {isError && (
         <section className="resultCard errorCard">
