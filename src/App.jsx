@@ -1,5 +1,7 @@
 import Editor from "@monaco-editor/react";
 import { useRef, useState } from "react";
+import prettier from "prettier/standalone";
+import babelParser from "prettier/plugins/babel";
 import "./App.css";
 
 function App() {
@@ -74,6 +76,10 @@ function App() {
       });
 
       const data = await response.json();
+      if (data.fixed_code) {
+        setCode(data.fixed_code);
+        clearEditorHighlights();
+      }
       setResult(data);
 
       if (data.status === "error" && data.error_line) {
@@ -93,25 +99,52 @@ function App() {
 
   const fixCode = async () => {
     setLoading(true);
+    if (selectedLanguage === "javascript") {
+      try {
+        const formattedCode = await prettier.format(code, {
+          parser: "babel",
+          plugins: [babelParser],
+          semi: true,
+        });
+
+        setCode(formattedCode);
+        clearEditorHighlights();
+        setResult({
+          status: "fixed",
+          message: "JavaScript kodu Prettier ile otomatik düzenlendi.",
+        });
+
+        return;
+      } catch (error) {
+        setResult({
+          status: "error",
+          message: "JavaScript kodu otomatik düzeltilemedi. Syntax hatası çok büyük olabilir.",
+          suggestion: error.message,
+        });
+
+        return;
+      }
+    }
 
     try {
-      const response = await fetch("http://127.0.0.1:8001/fix", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
-      });
+    const response = await fetch("http://127.0.0.1:8001/fix", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code,
+        language: selectedLanguage,
+      }),
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (data.fixed_code) {
-        setCode(data.fixed_code);
-        clearEditorHighlights();
-      }
+    if (data.fixed_code) {
+      setCode(data.fixed_code);
+      clearEditorHighlights();
+    }
 
-      setResult({
-        status: "fixed",
-        fixes: data.fixes,
-      });
+    setResult(data);
+      
     } catch (error) {
       setResult({
         status: "error",
@@ -172,7 +205,7 @@ function App() {
         <div>
           <div className="badge">AI Agent • Code Security Scanner</div>
           <h1>AI Code Analyzer</h1>
-          <p>Python kodlarını güvenlik, karmaşıklık ve kalite açısından analiz eder.</p>
+          <p>Kodları güvenlik, karmaşıklık ve kalite açısından analiz eder.</p>
         </div>
 
         <div className="statusBox">
@@ -185,7 +218,7 @@ function App() {
         <section className="editorPanel">
           <div className="panelHeader">
             <span>main.py</span>
-            <span className="smallText">Python Analysis Workspace</span>
+            <span className="smallText">Multi-Language Analysis Workspace</span>
           </div>
 
           <div className="editorBox">
@@ -205,10 +238,10 @@ function App() {
             </div>
 
             <label className="uploadButton">
-              Upload Python File
+              Upload Code File
               <input
                 type="file"
-                accept=".py"
+                accept=".py,.js,.java,.cpp,.cc,.cxx,.go"
                 onChange={handleSingleFileUpload}
                 hidden
               />
