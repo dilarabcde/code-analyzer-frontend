@@ -307,7 +307,48 @@ function App() {
               Score: {result?.security?.risk_score ?? "-"}
             </span>
           </div>
+          {result && ( //analizsonucu gelince kartları gösterecek
+          // yukarıdaki result varsa ekranda gösterecek
+            <div className="agentPipelineCard">
+              <h3>AI Agent Pipeline</h3>
 
+              <div className="pipelineSteps">
+
+                <div className="pipelineStep">
+                  <span className="stepNumber">1</span>
+                  <div>
+                    <strong>Syntax Agent</strong>
+                    <p>Kodun syntax analizi yapıldı.</p>
+                  </div>
+                </div>
+
+                <div className="pipelineStep">
+                  <span className="stepNumber">2</span>
+                  <div>
+                    <strong>Security Agent</strong>
+                    <p>Güvenlik riskleri tarandı.</p>
+                  </div>
+                </div>
+
+                <div className="pipelineStep">
+                  <span className="stepNumber">3</span>
+                  <div>
+                    <strong>Complexity Agent</strong>
+                    <p>Karmaşıklık hesaplandı.</p>
+                  </div>
+                </div>
+
+                <div className="pipelineStep">
+                  <span className="stepNumber">4</span>
+                  <div>
+                    <strong>Fix Agent</strong>
+                    <p>Otomatik düzeltme sistemi çalıştırıldı.</p>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
           <div className="aiCard">
             <h3>Complexity</h3>
             <p className="metricValue">
