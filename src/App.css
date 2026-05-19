@@ -590,3 +590,25 @@ body {
   border-color: #3b82f6;
   box-shadow: 0 0 24px rgba(59, 130, 246, 0.28);
 }
+
+/* Clean LLM review area */
+.llmReviewCard {
+  grid-column: 1 / -1;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.llmReviewText {
+  white-space: pre-wrap;
+  line-height: 1.75;
+  color: #cbd5e1;
+}
+
+/* Prevent sidebar cards from becoming oversized */
+.aiPanel .aiCard {
+  min-height: 0;
+}
+
+.aiPanel {
+  align-content: start;
+}

@@ -16,24 +16,29 @@ function App() {
   const monacoRef = useRef(null);
   const decorationsRef = useRef([]);
   const handleSingleFileUpload = (event) => {
-  const file = event.target.files[0];
+    const file = event.target.files[0];
 
-  if (!file) return;
+    if (!file) return;
 
-  if (!file.name.endsWith(".py")) {
-    alert("Lütfen sadece .py uzantılı Python dosyası yükleyin.");
-    return;
-  }
+    const allowedExtensions = [".py", ".js", ".java", ".cpp", ".cc", ".cxx", ".go"];
+    const isAllowed = allowedExtensions.some((extension) =>
+      file.name.toLowerCase().endsWith(extension)
+    );
 
-  const reader = new FileReader();
+    if (!isAllowed) {
+      alert("Lütfen desteklenen bir kod dosyası yükleyin: .py, .js, .java, .cpp, .cc, .cxx, .go");
+      return;
+    }
 
-  reader.onload = (e) => {
-    setCode(e.target.result);
-    clearEditorHighlights();
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      setCode(e.target.result);
+      clearEditorHighlights();
+    };
+
+    reader.readAsText(file);
   };
-
-  reader.readAsText(file);
-};
 
   const clearEditorHighlights = () => {
     const editor = editorRef.current;
@@ -99,6 +104,7 @@ function App() {
 
   const fixCode = async () => {
     setLoading(true);
+
     if (selectedLanguage === "javascript") {
       try {
         const formattedCode = await prettier.format(code, {
@@ -112,39 +118,40 @@ function App() {
         setResult({
           status: "fixed",
           message: "JavaScript kodu Prettier ile otomatik düzenlendi.",
+          fixes: ["JavaScript kodu formatlandı.", "Eksik noktalı virgüller ve girintileme düzenlendi."],
         });
-
-        return;
       } catch (error) {
         setResult({
           status: "error",
           message: "JavaScript kodu otomatik düzeltilemedi. Syntax hatası çok büyük olabilir.",
+          error_line: "-",
           suggestion: error.message,
         });
-
-        return;
+      } finally {
+        setLoading(false);
       }
+
+      return;
     }
 
     try {
-    const response = await fetch("http://127.0.0.1:8001/fix", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        code,
-        language: selectedLanguage,
-      }),
-    });
+      const response = await fetch("http://127.0.0.1:8001/fix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          language: selectedLanguage,
+        }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (data.fixed_code) {
-      setCode(data.fixed_code);
-      clearEditorHighlights();
-    }
+      if (data.fixed_code) {
+        setCode(data.fixed_code);
+        clearEditorHighlights();
+      }
 
-    setResult(data);
-      
+      setResult(data);
     } catch (error) {
       setResult({
         status: "error",
@@ -217,7 +224,7 @@ function App() {
       <main className="dashboard">
         <section className="editorPanel">
           <div className="panelHeader">
-            <span>main.py</span>
+            <span>{selectedLanguage.toUpperCase()}</span>
             <span className="smallText">Multi-Language Analysis Workspace</span>
           </div>
 
@@ -307,50 +314,10 @@ function App() {
               Score: {result?.security?.risk_score ?? "-"}
             </span>
           </div>
-          {result && ( //analizsonucu gelince kartları gösterecek
-          // yukarıdaki result varsa ekranda gösterecek
-            <div className="agentPipelineCard">
-              <h3>AI Agent Pipeline</h3>
 
-              <div className="pipelineSteps">
-
-                <div className="pipelineStep">
-                  <span className="stepNumber">1</span>
-                  <div>
-                    <strong>Syntax Agent</strong>
-                    <p>Kodun syntax analizi yapıldı.</p>
-                  </div>
-                </div>
-
-                <div className="pipelineStep">
-                  <span className="stepNumber">2</span>
-                  <div>
-                    <strong>Security Agent</strong>
-                    <p>Güvenlik riskleri tarandı.</p>
-                  </div>
-                </div>
-
-                <div className="pipelineStep">
-                  <span className="stepNumber">3</span>
-                  <div>
-                    <strong>Complexity Agent</strong>
-                    <p>Karmaşıklık hesaplandı.</p>
-                  </div>
-                </div>
-
-                <div className="pipelineStep">
-                  <span className="stepNumber">4</span>
-                  <div>
-                    <strong>Fix Agent</strong>
-                    <p>Otomatik düzeltme sistemi çalıştırıldı.</p>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          )}
           <div className="aiCard">
             <h3>Complexity</h3>
+      
             <p className="metricValue">
               {result?.analysis?.complexity?.level?.toUpperCase() || "-"}
             </p>
@@ -364,12 +331,11 @@ function App() {
         <div className="projectHeader">
           <div>
             <h2>Project Understanding Mode</h2>
-            <p>Birden fazla Python dosyası yükle, sistem projenin ne yaptığını analiz etsin.</p>
+            <p>Birden fazla kod dosyası yükle, sistem projenin ne yaptığını analiz etsin.</p>
           </div>
 
           <span className="projectBadge">Codebase Analyzer</span>
         </div>
-
         <div className="uploadBox">
           <input
             type="file"
@@ -493,6 +459,13 @@ function App() {
               ))}
             </ul>
           </div>
+
+          {result.llm_analysis && (
+            <div className="resultCard llmReviewCard">
+              <h2>LLM Reasoning Agent</h2>
+              <p className="llmReviewText">{result.llm_analysis}</p>
+            </div>
+          )}
         </section>
       )}
     </div>
