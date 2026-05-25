@@ -12,15 +12,15 @@ function App() {
   const [projectFiles, setProjectFiles] = useState([]);
   const [projectResult, setProjectResult] = useState(null);
 
-  const editorRef = useRef(null);
-  const monacoRef = useRef(null);
-  const decorationsRef = useRef([]);
+  const editorRef = useRef(null); // editör referansı tutulur sonradan satır işaretlemek için
+  const monacoRef = useRef(null); // monaco objesine erişmek gerekiyor bazı editor özellikleri için
+  const decorationsRef = useRef([]); // hata satırlarını temizleyip yeniden boyamak için tutuyorum
   const handleSingleFileUpload = (event) => {
     const file = event.target.files[0];
 
     if (!file) return;
-
-    const allowedExtensions = [".py", ".js", ".java", ".cpp", ".cc", ".cxx", ".go"];
+// destklenmeyen sosyalar engellensin
+    const allowedExtensions = [".py", ".js", ".java", ".cpp", ".cc", ".cxx", ".go"]; 
     const isAllowed = allowedExtensions.some((extension) =>
       file.name.toLowerCase().endsWith(extension)
     );
@@ -34,19 +34,19 @@ function App() {
 
     reader.onload = (e) => {
       setCode(e.target.result);
-      clearEditorHighlights();
+      clearEditorHighlights(); // editör yeniden render olduğunda eski hataları temizle
     };
 
     reader.readAsText(file);
   };
 
-  const clearEditorHighlights = () => {
+  const clearEditorHighlights = () => { // editördeki eski hata işaretlerini kaldıracak
     const editor = editorRef.current;
     if (!editor) return;
     decorationsRef.current = editor.deltaDecorations(decorationsRef.current, []);
   };
 
-  const markErrorLine = (errorLine) => {
+  const markErrorLine = (errorLine) => { // hata olan satırı kırmızı gösteriyoruz kullanıcı rahat görsün diye
     const editor = editorRef.current;
     const monaco = monacoRef.current;
     if (!editor || !monaco || !errorLine) return;
@@ -64,7 +64,7 @@ function App() {
 
     editor.revealLineInCenter(errorLine);
   };
-
+// backend'e analiz isteği atılıyor
   const analyzeCode = async () => {
     clearEditorHighlights();
     setLoading(true);
@@ -81,7 +81,7 @@ function App() {
       });
 
       const data = await response.json();
-      if (data.fixed_code) {
+      if (data.fixed_code) { // düzeltilmiş kod dönerse editöre geri bas
         setCode(data.fixed_code);
         clearEditorHighlights();
       }
@@ -105,7 +105,7 @@ function App() {
   const fixCode = async () => {
     setLoading(true);
 
-    if (selectedLanguage === "javascript") {
+    if (selectedLanguage === "javascript") { // javascript için prettier kullanıyoruz
       try {
         const formattedCode = await prettier.format(code, {
           parser: "babel",
@@ -120,7 +120,7 @@ function App() {
           message: "JavaScript kodu Prettier ile otomatik düzenlendi.",
           fixes: ["JavaScript kodu formatlandı.", "Eksik noktalı virgüller ve girintileme düzenlendi."],
         });
-      } catch (error) {
+      } catch (error) { // syntax çok bozuksa prettier patlayabiliyor
         setResult({
           status: "error",
           message: "JavaScript kodu otomatik düzeltilemedi. Syntax hatası çok büyük olabilir.",
@@ -177,12 +177,13 @@ function App() {
 
   const formData = new FormData();
 
-  projectFiles.forEach((file) => {
+  projectFiles.forEach((file) => { // proje içindeki tüm dosyaları formdata ile backend'e gönder
     formData.append("files", file);
   });
 
   try {
-    const response = await fetch("http://127.0.0.1:8001/analyze-project", {
+    const response = await fetch("http://127.0.0.1:8001/analyze-project", { // proje seviyesinde analiz yapan endpoint
+
       method: "POST",
       body: formData,
     });
@@ -279,7 +280,7 @@ function App() {
             />
             </div>
           <div className="buttons">
-            <button className="actionButton analyzeButton" onClick={analyzeCode} disabled={loading}>
+            <button className="actionButton analyzeButton" onClick={analyzeCode} disabled={loading}> // loading sırasında buton spamlanmasın diye disable ediyoruz
               {loading ? "Analyzing..." : "Analyze Code"}
             </button>
 
@@ -356,7 +357,7 @@ function App() {
 
         {projectFiles.length > 0 && (
           <div className="fileList">
-            {projectFiles.map((file, index) => (
+            {projectFiles.map((file, index) => ( // yüklenen dosyaları küçük kartlar halinde göster
               <span key={index} className="fileChip">
                 {file.name}
               </span>
@@ -410,7 +411,7 @@ function App() {
                     <p className="file-purpose">
                       {file.purpose}
                     </p>
-                    {file.llm_analysis && (
+                    {file.llm_analysis && ( // llm yorum kısmı
                       <div className="llmBox">
                         <h4>AI Analysis</h4>
                         <p>{file.llm_analysis}</p>
