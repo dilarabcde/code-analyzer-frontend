@@ -280,7 +280,7 @@ function App() {
             />
             </div>
           <div className="buttons">
-            <button className="actionButton analyzeButton" onClick={analyzeCode} disabled={loading}> // loading sırasında buton spamlanmasın diye disable ediyoruz
+            <button className="actionButton analyzeButton" onClick={analyzeCode} disabled={loading}> 
               {loading ? "Analyzing..." : "Analyze Code"}
             </button>
 
